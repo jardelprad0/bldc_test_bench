@@ -3,6 +3,7 @@
 #include <SD.h>
 #include <STM32RTC.h> // Biblioteca do RTC
 #include "MedirCelulasdeCarga.h"
+#include "MedirCorrente.h" // Inclui a nossa nova biblioteca
 
 // --- CONFIGURAÇÃO SERIAL E SD ---
 #if defined(USBCON)
@@ -21,7 +22,6 @@ bool SDok = false;
 String nomeArquivoCSV = "dados.csv";
 
 // --- OBJETOS GLOBAIS ---
-/* Get the rtc object */
 STM32RTC& rtc = STM32RTC::getInstance();
 
 // --- PROTÓTIPOS ---
@@ -34,51 +34,37 @@ void setup() {
   while (!MySerial && millis() < 4000) { ; }
   delay(1000);
 
-  MySerial.println(">>> Iniciando Sistema Modularizado com RTC <<<");
+  MySerial.println(">>> Iniciando Sistema: Carga + Corrente <<<");
 
   // 1. Inicializar RTC
-  rtc.setClockSource(STM32RTC::LSE_CLOCK); // Tenta forçar LSE (Cristal Externo) para funcionar com bateria
+  rtc.setClockSource(STM32RTC::LSE_CLOCK); 
   rtc.begin(); 
 
-  // Diagnóstico do RTC no Boot
+  // Diagnóstico do RTC
   if (rtc.getClockSource() == STM32RTC::LSE_CLOCK) {
-    MySerial.println("RTC Clock: LSE (OK - Bateria deve funcionar).");
+    MySerial.println("RTC Clock: LSE (OK).");
   } else {
-    MySerial.println("RTC Clock: LSI (AVISO: Usando clock interno, hora vai parar ao desligar).");
+    MySerial.println("RTC Clock: LSI (AVISO: Clock interno).");
   }
 
-  // Ler data/hora atual para diagnóstico
+  // Verificar se Data é válida
   uint8_t h, m, s, d, mo, y, wd;
   uint32_t ss;
-  rtc.getTime(&h, &m, &s, &ss);
   rtc.getDate(&wd, &d, &mo, &y);
+  rtc.getTime(&h, &m, &s, &ss);
   
-  MySerial.print("Data/Hora lida do RTC no boot: 20");
-  MySerial.print(y); MySerial.print("-"); MySerial.print(mo); MySerial.print("-"); MySerial.print(d);
-  MySerial.print(" "); MySerial.print(h); MySerial.print(":"); MySerial.print(m); MySerial.print(":"); MySerial.println(s);
-
-  // Lógica de ajuste:
-  // Se o ano for < 25 (ex: 2000), assumimos que a bateria falhou ou é o primeiro uso.
-  // Nesse caso, atualizamos para a data de compilação.
   if (!rtc.isTimeSet() || y < 25) {
-    MySerial.println("Data invalida detectada (Bateria falhou?). Ajustando para hora da compilacao...");
+    MySerial.println("Data invalida. Ajustando RTC...");
     configurarRTCAutomaticamente();
-  } else {
-    MySerial.println("RTC parece valido. Mantendo hora atual.");
   }
 
-  // Atualizar nome do arquivo com base na hora atual (seja ela lida ou ajustada)
-  rtc.getTime(&h, &m, &s, &ss);
-  rtc.getDate(&wd, &d, &mo, &y);
+  // Nome do Arquivo CSV (Data/Hora)
   char fileNameBuf[32];
-  // Formato 8.3 (max 8 chars nome): DDMMHHMM.csv (Ex: 27110912.csv)
-  // O formato anterior "Dados_..." era muito longo para o sistema de arquivos FAT padrão do Arduino
   sprintf(fileNameBuf, "%02d%02d%02d%02d.csv", d, mo, h, m);
   nomeArquivoCSV = String(fileNameBuf);
-  MySerial.print("Arquivo de log definido: ");
-  MySerial.println(nomeArquivoCSV);
+  MySerial.print("Arquivo Log: "); MySerial.println(nomeArquivoCSV);
 
-  // 2. Inicializar Hardware SD
+  // 2. Inicializar SD
   pinMode(PD2, INPUT_PULLUP);
   pinMode(PC8, INPUT_PULLUP);
   pinMode(PC12, INPUT_PULLUP);
@@ -94,115 +80,118 @@ void setup() {
     MySerial.println("SD Card OK.");
     SDok = true;
     
-    // Cabeçalho CSV atualizado com DataHora e Millis
+    // Cabeçalho CSV Completo
     File dataFile = SD.open(nomeArquivoCSV.c_str(), FILE_WRITE);
     if (dataFile) {
       if (dataFile.size() == 0) {
-        // Adicionada a coluna Millis e DataHora no início
-        dataFile.println("Millis,DataHora,Torque(Nm),LeituraTorque(g),Forca(Kg),LeituraThrust(g)");
+        dataFile.println("Millis,DataHora,Torque(Nm),Thrust(Kg),AC1(A),AC2(A),AC3(A),DC(A)");
       }
       dataFile.close();
     }
   }
 
-  // 3. Inicializar Módulo de Células
-  MySerial.println("Calibrando celulas...");
+  // 3. Inicializar Sensores de Carga
+  MySerial.println("Configurando Celulas de Carga...");
   configurarCelulas(); 
+
+  // 4. Inicializar Sensores de Corrente
+  MySerial.println("Configurando Sensores de Corrente...");
+  configurarSensoresCorrente();
+  
+  // --- PASSO CRÍTICO: CALIBRAÇÃO (TARA) ---
+  MySerial.println("A CALIBRAR ZERO DE CORRENTE... (Nao ligue cargas agora)");
+  calibrarZeroCorrente();
+  MySerial.println("Calibracao Concluida.");
 
   MySerial.println("Sistema pronto.");
 }
 
 void loop() {
   processarCicloDeLeitura();
-  delay(1000); 
+  // Delay reduzido pois a leitura AC já consome ~40ms
+  delay(500); 
 }
 
-// --- FUNÇÃO INTEGRADORA ---
 void processarCicloDeLeitura() {
   
-  // 1. OBTER DADOS E DATA/HORA
-  DadosMedicao dados = lerDadosSensores();
+  // 1. LER DADOS
+  DadosMedicao dadosCarga = lerDadosSensores();
+  DadosCorrente dadosAmper = lerSensoresCorrente();
   String dataHora = obterDataHoraFormatada();
 
   // 2. MOSTRAR NO TERMINAL
-  MySerial.print("[");
-  MySerial.print(dataHora);
-  MySerial.print("] ");
+  MySerial.print("["); MySerial.print(dataHora); MySerial.println("]");
   
-  MySerial.print("Torque: ");
-  MySerial.print(dados.torqueNm, 3);
-  MySerial.print(" N.m | ");
-  
-  MySerial.print("Thrust: ");
-  MySerial.print(dados.thrustKg, 3);
+  MySerial.print(" Mecanica | Torque: ");
+  MySerial.print(dadosCarga.torqueNm, 2);
+  MySerial.print(" Nm | Thrust: ");
+  MySerial.print(dadosCarga.thrustKg, 2);
   MySerial.println(" Kg");
+
+  MySerial.print(" Eletrica | AC1: ");
+  MySerial.print(dadosAmper.correnteAC1, 1);
+  MySerial.print("A | AC2: ");
+  MySerial.print(dadosAmper.correnteAC2, 1);
+  MySerial.print("A | AC3: ");
+  MySerial.print(dadosAmper.correnteAC3, 1);
+  MySerial.print("A | DC: ");
+  MySerial.print(dadosAmper.correnteDC, 1);
+  MySerial.println("A");
+  MySerial.println("-----------------------------");
 
   // 3. GRAVAR NO SD
   if (SDok) {
     File dataFile = SD.open(nomeArquivoCSV.c_str(), FILE_WRITE);
     if (dataFile) {
-      dataFile.print(millis()); // Grava os milissegundos desde o boot
+      dataFile.print(millis());
       dataFile.print(",");
-      dataFile.print(dataHora); // Grava a data e hora
+      dataFile.print(dataHora);
       dataFile.print(",");
-      dataFile.print(dados.torqueNm, 4);
+      dataFile.print(dadosCarga.torqueNm, 3);
       dataFile.print(",");
-      dataFile.print(dados.rawTorqueG, 2);
+      dataFile.print(dadosCarga.thrustKg, 3);
       dataFile.print(",");
-      dataFile.print(dados.thrustKg, 4);
+      // Dados Elétricos
+      dataFile.print(dadosAmper.correnteAC1, 2);
       dataFile.print(",");
-      dataFile.println(dados.rawThrustG, 2);
+      dataFile.print(dadosAmper.correnteAC2, 2);
+      dataFile.print(",");
+      dataFile.print(dadosAmper.correnteAC3, 2);
+      dataFile.print(",");
+      dataFile.println(dadosAmper.correnteDC, 2);
       
       dataFile.close();
     } else {
-      MySerial.println("Erro SD: Abrir arquivo.");
+      // Se falhar a abrir, tenta reiniciar o flag (opcional)
+      // MySerial.println("Erro SD: Gravar."); 
     }
   }
 }
 
 // --- FUNÇÕES AUXILIARES RTC ---
-
-// Retorna string no formato "DD/MM/YYYY HH:MM:SS"
 String obterDataHoraFormatada() {
-  // Ler hora e data do RTC
   uint8_t hours, minutes, seconds;
   uint32_t subSeconds;
-  uint8_t day, month, year; // STM32RTC usa ano com 2 dígitos (ex: 23 para 2023)
-  uint8_t weekDay;
+  uint8_t day, month, year, weekDay;
   
   rtc.getTime(&hours, &minutes, &seconds, &subSeconds);
   rtc.getDate(&weekDay, &day, &month, &year);
 
   char buffer[25];
-  // Formata: 2025-11-27 10:30:05 (Formato ISO facilita ordenar no Excel)
   sprintf(buffer, "20%02d-%02d-%02d %02d:%02d:%02d", year, month, day, hours, minutes, seconds);
-  
   return String(buffer);
 }
 
-// Configura o RTC com base no momento da compilação do código
 void configurarRTCAutomaticamente() {
-  // Macros __DATE__ = "Mmm dd yyyy" (ex: "Nov 27 2025")
-  // Macros __TIME__ = "hh:mm:ss" (ex: "10:30:05")
   char s_month[5];
   int year, day, hour, minute, second;
-  
-  // Mapeamento de meses
   static const char month_names[] = "JanFebMarAprMayJunJulAugSepOctNovDec";
 
   sscanf(__DATE__, "%s %d %d", s_month, &day, &year);
   sscanf(__TIME__, "%d:%d:%d", &hour, &minute, &second);
 
-  // Converter nome do mês para número
   int month = (strstr(month_names, s_month) - month_names) / 3 + 1;
-  
-  // Ajustar ano para 2 dígitos (STM32RTC library standard)
   int year2d = year - 2000;
-
-  MySerial.print("Configurando RTC para: ");
-  MySerial.print(year); MySerial.print("-"); MySerial.print(month); MySerial.print("-"); MySerial.print(day);
-  MySerial.print(" ");
-  MySerial.print(hour); MySerial.print(":"); MySerial.print(minute); MySerial.print(":"); MySerial.println(second);
 
   rtc.setTime(hour, minute, second);
   rtc.setDate(day, month, year2d);
