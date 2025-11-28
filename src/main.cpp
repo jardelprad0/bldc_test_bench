@@ -1,9 +1,10 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include <SD.h>
-#include <STM32RTC.h> // Biblioteca do RTC
+#include <STM32RTC.h>
 #include "MedirCelulasdeCarga.h"
-#include "MedirCorrente.h" // Inclui a nossa nova biblioteca
+#include "MedirCorrente.h"
+#include "MedirTensao.h"
 
 // --- CONFIGURAÇÃO SERIAL E SD ---
 #if defined(USBCON)
@@ -34,47 +35,36 @@ void setup() {
   while (!MySerial && millis() < 4000) { ; }
   delay(1000);
 
-  MySerial.println(">>> Iniciando Sistema: Carga + Corrente <<<");
+  MySerial.println(">>> Monitoramento Completo: Fase, Total, Tensao e Potencia <<<");
 
   // 1. Inicializar RTC
   rtc.setClockSource(STM32RTC::LSE_CLOCK); 
   rtc.begin(); 
 
-  // Diagnóstico do RTC
-  if (rtc.getClockSource() == STM32RTC::LSE_CLOCK) {
-    MySerial.println("RTC Clock: LSE (OK).");
-  } else {
-    MySerial.println("RTC Clock: LSI (AVISO: Clock interno).");
-  }
-
-  // Verificar se Data é válida
-  uint8_t h, m, s, d, mo, y, wd;
-  uint32_t ss;
+  // Verificar Data e Hora
+  uint8_t wd, d, mo, y;
   rtc.getDate(&wd, &d, &mo, &y);
-  rtc.getTime(&h, &m, &s, &ss);
-  
   if (!rtc.isTimeSet() || y < 25) {
-    MySerial.println("Data invalida. Ajustando RTC...");
     configurarRTCAutomaticamente();
   }
 
-  // Nome do Arquivo CSV (Data/Hora)
+  // Nome do Arquivo de Log
+  uint8_t h, m, s;
+  uint32_t ss;
+  rtc.getTime(&h, &m, &s, &ss);
   char fileNameBuf[32];
   sprintf(fileNameBuf, "%02d%02d%02d%02d.csv", d, mo, h, m);
   nomeArquivoCSV = String(fileNameBuf);
-  MySerial.print("Arquivo Log: "); MySerial.println(nomeArquivoCSV);
+  MySerial.print("Log criado: "); MySerial.println(nomeArquivoCSV);
 
   // 2. Inicializar SD
   pinMode(PD2, INPUT_PULLUP);
   pinMode(PC8, INPUT_PULLUP);
   pinMode(PC12, INPUT_PULLUP);
-  
-  SPI.setMOSI(SD_MOSI);
-  SPI.setMISO(SD_MISO);
-  SPI.setSCLK(SD_CLK);
+  SPI.setMOSI(SD_MOSI); SPI.setMISO(SD_MISO); SPI.setSCLK(SD_CLK);
 
   if (!SD.begin(SD_CS)) {
-    MySerial.println("ERRO: SD Card falhou!");
+    MySerial.println("ERRO: Falha no SD Card!");
     SDok = false;
   } else {
     MySerial.println("SD Card OK.");
@@ -84,101 +74,104 @@ void setup() {
     File dataFile = SD.open(nomeArquivoCSV.c_str(), FILE_WRITE);
     if (dataFile) {
       if (dataFile.size() == 0) {
-        dataFile.println("Millis,DataHora,Torque(Nm),Thrust(Kg),AC1(A),AC2(A),AC3(A),DC(A)");
+        dataFile.println("Millis,Data,Torque(Nm),Thrust(Kg),AC1(A),AC2(A),AC3(A),DC_Total(A),Tensao(V),Potencia(W)");
       }
       dataFile.close();
     }
   }
 
-  // 3. Inicializar Sensores de Carga
-  MySerial.println("Configurando Celulas de Carga...");
+  // 3. Inicializar Sensores
+  MySerial.println("-> Celulas de Carga...");
   configurarCelulas(); 
 
-  // 4. Inicializar Sensores de Corrente
-  MySerial.println("Configurando Sensores de Corrente...");
+  MySerial.println("-> Sensores de Corrente (ACS758)...");
   configurarSensoresCorrente();
   
-  // --- PASSO CRÍTICO: CALIBRAÇÃO (TARA) ---
-  MySerial.println("A CALIBRAR ZERO DE CORRENTE... (Nao ligue cargas agora)");
+  MySerial.println("-> Sensor de Tensao (INA219)...");
+  configurarSensorTensao();
+  
+  // Tara da Corrente (Zero)
+  MySerial.println("-> Calibrando zero da corrente (Aguarde)...");
   calibrarZeroCorrente();
-  MySerial.println("Calibracao Concluida.");
-
-  MySerial.println("Sistema pronto.");
+  
+  MySerial.println("SISTEMA PRONTO.");
 }
 
 void loop() {
   processarCicloDeLeitura();
-  // Delay reduzido pois a leitura AC já consome ~40ms
-  delay(500); 
+  // Taxa de atualização (ajuste conforme necessário para o Serial Plotter não engasgar)
+  delay(250); 
 }
 
 void processarCicloDeLeitura() {
   
-  // 1. LER DADOS
+  // 1. LEITURA SINCRONIZADA DOS SENSORES
   DadosMedicao dadosCarga = lerDadosSensores();
   DadosCorrente dadosAmper = lerSensoresCorrente();
-  String dataHora = obterDataHoraFormatada();
-
-  // 2. MOSTRAR NO TERMINAL
-  MySerial.print("["); MySerial.print(dataHora); MySerial.println("]");
+  DadosTensao dadosVolts  = lerSensorTensao();
   
-  MySerial.print(" Mecanica | Torque: ");
-  MySerial.print(dadosCarga.torqueNm, 2);
-  MySerial.print(" Nm | Thrust: ");
-  MySerial.print(dadosCarga.thrustKg, 2);
-  MySerial.println(" Kg");
+  // 2. CÁLCULO DE POTÊNCIA REAL (HÍBRIDO)
+  // Potência (W) = Tensão Medida (INA219) * Corrente Total DC (ACS758)
+  float potenciaReal_W = dadosVolts.tensaoV * dadosAmper.correnteDC;
 
-  MySerial.print(" Eletrica | AC1: ");
-  MySerial.print(dadosAmper.correnteAC1, 1);
-  MySerial.print("A | AC2: ");
-  MySerial.print(dadosAmper.correnteAC2, 1);
-  MySerial.print("A | AC3: ");
-  MySerial.print(dadosAmper.correnteAC3, 1);
-  MySerial.print("A | DC: ");
-  MySerial.print(dadosAmper.correnteDC, 1);
-  MySerial.println("A");
-  MySerial.println("-----------------------------");
+  // Evitar potência negativa por ruído de corrente zero
+  if (potenciaReal_W < 0) potenciaReal_W = 0;
 
-  // 3. GRAVAR NO SD
+  // 3. PLOTTER SERIAL (Formato Label:Valor para Arduino Plotter)
+  // Exibe todas as correntes de fase, a DC total, Tensão e Potência
+  MySerial.print("AC1:"); MySerial.print(dadosAmper.correnteAC1, 1);
+  MySerial.print(" AC2:"); MySerial.print(dadosAmper.correnteAC2, 1);
+  MySerial.print(" AC3:"); MySerial.print(dadosAmper.correnteAC3, 1);
+  MySerial.print(" Total_DC:"); MySerial.print(dadosAmper.correnteDC, 1);
+  MySerial.print(" Tensao:");   MySerial.print(dadosVolts.tensaoV, 2);
+  MySerial.print(" Potencia_W:"); MySerial.print(potenciaReal_W, 1);
+  
+  // Se quiser ver Torque/Thrust no plotter também, descomente abaixo:
+  // MySerial.print(" Torque:"); MySerial.print(dadosCarga.torqueNm, 2);
+  // MySerial.print(" Thrust:"); MySerial.print(dadosCarga.thrustKg, 2);
+  
+  MySerial.println(); // Fim da linha para o Plotter
+
+  // 4. GRAVAÇÃO NO SD (CSV)
   if (SDok) {
     File dataFile = SD.open(nomeArquivoCSV.c_str(), FILE_WRITE);
     if (dataFile) {
       dataFile.print(millis());
       dataFile.print(",");
-      dataFile.print(dataHora);
+      dataFile.print(obterDataHoraFormatada());
       dataFile.print(",");
+      // Mecânica
       dataFile.print(dadosCarga.torqueNm, 3);
       dataFile.print(",");
       dataFile.print(dadosCarga.thrustKg, 3);
       dataFile.print(",");
-      // Dados Elétricos
+      // Elétrica (Fases)
       dataFile.print(dadosAmper.correnteAC1, 2);
       dataFile.print(",");
       dataFile.print(dadosAmper.correnteAC2, 2);
       dataFile.print(",");
       dataFile.print(dadosAmper.correnteAC3, 2);
       dataFile.print(",");
-      dataFile.println(dadosAmper.correnteDC, 2);
+      // Elétrica (Entrada/Total)
+      dataFile.print(dadosAmper.correnteDC, 2);
+      dataFile.print(",");
+      dataFile.print(dadosVolts.tensaoV, 2);
+      dataFile.print(",");
+      dataFile.println(potenciaReal_W, 2); 
       
       dataFile.close();
-    } else {
-      // Se falhar a abrir, tenta reiniciar o flag (opcional)
-      // MySerial.println("Erro SD: Gravar."); 
     }
   }
 }
 
 // --- FUNÇÕES AUXILIARES RTC ---
 String obterDataHoraFormatada() {
-  uint8_t hours, minutes, seconds;
-  uint32_t subSeconds;
-  uint8_t day, month, year, weekDay;
-  
-  rtc.getTime(&hours, &minutes, &seconds, &subSeconds);
-  rtc.getDate(&weekDay, &day, &month, &year);
-
+  uint8_t h, m, s, d, mo, y, wd;
+  uint32_t ss;
+  rtc.getTime(&h, &m, &s, &ss);
+  rtc.getDate(&wd, &d, &mo, &y);
   char buffer[25];
-  sprintf(buffer, "20%02d-%02d-%02d %02d:%02d:%02d", year, month, day, hours, minutes, seconds);
+  sprintf(buffer, "20%02d-%02d-%02d %02d:%02d:%02d", y, mo, d, h, m, s);
   return String(buffer);
 }
 
@@ -186,13 +179,9 @@ void configurarRTCAutomaticamente() {
   char s_month[5];
   int year, day, hour, minute, second;
   static const char month_names[] = "JanFebMarAprMayJunJulAugSepOctNovDec";
-
   sscanf(__DATE__, "%s %d %d", s_month, &day, &year);
   sscanf(__TIME__, "%d:%d:%d", &hour, &minute, &second);
-
   int month = (strstr(month_names, s_month) - month_names) / 3 + 1;
-  int year2d = year - 2000;
-
   rtc.setTime(hour, minute, second);
-  rtc.setDate(day, month, year2d);
+  rtc.setDate(day, month, year - 2000);
 }
