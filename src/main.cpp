@@ -119,16 +119,17 @@ void processarCicloDeLeitura() {
 
   // 3. PLOTTER SERIAL (Formato Label:Valor para Arduino Plotter)
   // Exibe todas as correntes de fase, a DC total, Tensão e Potência
-  MySerial.print("AC1:"); MySerial.print(dadosAmper.correnteAC1, 1);
-  MySerial.print(" AC2:"); MySerial.print(dadosAmper.correnteAC2, 1);
-  MySerial.print(" AC3:"); MySerial.print(dadosAmper.correnteAC3, 1);
-  MySerial.print(" Total_DC:"); MySerial.print(dadosAmper.correnteDC, 1);
+  MySerial.print(" Torque:"); MySerial.print(dadosCarga.torqueNm, 2);
+  MySerial.print(" Thrust:"); MySerial.print(dadosCarga.thrustKg, 2);
+  MySerial.print(" AC1:"); MySerial.print(dadosAmper.correnteAC1, 2);
+  MySerial.print(" AC2:"); MySerial.print(dadosAmper.correnteAC2, 2);
+  MySerial.print(" AC3:"); MySerial.print(dadosAmper.correnteAC3, 2);
+  MySerial.print(" Total_DC:"); MySerial.print(dadosAmper.correnteDC, 2);
   MySerial.print(" Tensao:");   MySerial.print(dadosVolts.tensaoV, 2);
-  MySerial.print(" Potencia_W:"); MySerial.print(potenciaReal_W, 1);
+  MySerial.print(" Potencia_W:"); MySerial.print(potenciaReal_W, 2);
   
   // Se quiser ver Torque/Thrust no plotter também, descomente abaixo:
-  // MySerial.print(" Torque:"); MySerial.print(dadosCarga.torqueNm, 2);
-  // MySerial.print(" Thrust:"); MySerial.print(dadosCarga.thrustKg, 2);
+
   
   MySerial.println(); // Fim da linha para o Plotter
 
