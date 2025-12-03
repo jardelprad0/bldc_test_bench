@@ -5,6 +5,7 @@
 #include "MedirCelulasdeCarga.h"
 #include "MedirCorrente.h"
 #include "MedirTensao.h"
+#include "MedirRPM.h" // <--- INCLUÍDO AQUI
 
 // --- CONFIGURAÇÃO SERIAL E SD ---
 #if defined(USBCON)
@@ -29,13 +30,14 @@ STM32RTC& rtc = STM32RTC::getInstance();
 void processarCicloDeLeitura();
 void configurarRTCAutomaticamente();
 String obterDataHoraFormatada();
+String formatFloat(float val, int casas); // Função auxiliar para formatar com vírgula
 
 void setup() {
   MySerial.begin(115200);
   while (!MySerial && millis() < 4000) { ; }
   delay(1000);
 
-  MySerial.println(">>> Monitoramento Completo: Fase, Total, Tensao e Potencia <<<");
+  MySerial.println(">>> Monitoramento Completo: Fase, Total, Tensao, Potencia e RPM <<<");
 
   // 1. Inicializar RTC
   rtc.setClockSource(STM32RTC::LSE_CLOCK); 
@@ -70,11 +72,12 @@ void setup() {
     MySerial.println("SD Card OK.");
     SDok = true;
     
-    // Cabeçalho CSV Completo
+    // Cabeçalho CSV Completo (Adicionado RPM)
+    // Alterado para usar ponto e vírgula (;) como separador de colunas
     File dataFile = SD.open(nomeArquivoCSV.c_str(), FILE_WRITE);
     if (dataFile) {
       if (dataFile.size() == 0) {
-        dataFile.println("Millis,Data,Torque(Nm),Thrust(Kg),AC1(A),AC2(A),AC3(A),DC_Total(A),Tensao(V),Potencia(W)");
+        dataFile.println("Millis;Data;Torque(Nm);Thrust(Kg);AC1(A);AC2(A);AC3(A);DC_Total(A);Tensao(V);Potencia(W);RPM");
       }
       dataFile.close();
     }
@@ -89,6 +92,9 @@ void setup() {
   
   MySerial.println("-> Sensor de Tensao (INA219)...");
   configurarSensorTensao();
+
+  MySerial.println("-> Sensor de RPM (Interrupt)...");
+  configurarRPM(); // <--- CONFIGURAÇÃO RPM
   
   // Tara da Corrente (Zero)
   MySerial.println("-> Calibrando zero da corrente (Aguarde)...");
@@ -99,7 +105,7 @@ void setup() {
 
 void loop() {
   processarCicloDeLeitura();
-  // Taxa de atualização (ajuste conforme necessário para o Serial Plotter não engasgar)
+  // Taxa de atualização (o RPM calcula internamente a cada X ms, mas a exibição segue este delay)
   delay(250); 
 }
 
@@ -109,56 +115,55 @@ void processarCicloDeLeitura() {
   DadosMedicao dadosCarga = lerDadosSensores();
   DadosCorrente dadosAmper = lerSensoresCorrente();
   DadosTensao dadosVolts  = lerSensorTensao();
+  DadosRPM dadosRotacao   = lerRPM(); // <--- LEITURA RPM
   
   // 2. CÁLCULO DE POTÊNCIA REAL (HÍBRIDO)
-  // Potência (W) = Tensão Medida (INA219) * Corrente Total DC (ACS758)
   float potenciaReal_W = dadosVolts.tensaoV * dadosAmper.correnteDC;
-
-  // Evitar potência negativa por ruído de corrente zero
   if (potenciaReal_W < 0) potenciaReal_W = 0;
 
-  // 3. PLOTTER SERIAL (Formato Label:Valor para Arduino Plotter)
-  // Exibe todas as correntes de fase, a DC total, Tensão e Potência
-  MySerial.print(" Torque:"); MySerial.print(dadosCarga.torqueNm, 2);
-  MySerial.print(" Thrust:"); MySerial.print(dadosCarga.thrustKg, 2);
-  MySerial.print(" AC1:"); MySerial.print(dadosAmper.correnteAC1, 2);
-  MySerial.print(" AC2:"); MySerial.print(dadosAmper.correnteAC2, 2);
-  MySerial.print(" AC3:"); MySerial.print(dadosAmper.correnteAC3, 2);
-  MySerial.print(" Total_DC:"); MySerial.print(dadosAmper.correnteDC, 2);
-  MySerial.print(" Tensao:");   MySerial.print(dadosVolts.tensaoV, 2);
-  MySerial.print(" Potencia_W:"); MySerial.print(potenciaReal_W, 2);
+  // 3. PLOTTER SERIAL (Usando vírgula)
+  // Nota: O Serial Plotter padrão do Arduino pode não plotar gráficos corretamente com vírgula,
+  // mas o Monitor Serial exibirá o texto conforme solicitado.
+  MySerial.print(" Torque:");   MySerial.print(formatFloat(dadosCarga.torqueNm, 2));
+  MySerial.print(" Thrust:");   MySerial.print(formatFloat(dadosCarga.thrustKg, 2));
+  MySerial.print(" AC1:");      MySerial.print(formatFloat(dadosAmper.correnteAC1, 2));
+  // MySerial.print(" AC2:");   MySerial.print(formatFloat(dadosAmper.correnteAC2, 2));
+  // MySerial.print(" AC3:");   MySerial.print(formatFloat(dadosAmper.correnteAC3, 2));
+  MySerial.print(" Total_DC:"); MySerial.print(formatFloat(dadosAmper.correnteDC, 2));
+  MySerial.print(" Tensao:");   MySerial.print(formatFloat(dadosVolts.tensaoV, 2));
+  MySerial.print(" Potencia_W:"); MySerial.print(formatFloat(potenciaReal_W, 2));
+  MySerial.print(" RPM:");      MySerial.print(formatFloat(dadosRotacao.rpm, 0)); 
   
-  // Se quiser ver Torque/Thrust no plotter também, descomente abaixo:
+  MySerial.println(); 
 
-  
-  MySerial.println(); // Fim da linha para o Plotter
-
-  // 4. GRAVAÇÃO NO SD (CSV)
+  // 4. GRAVAÇÃO NO SD (CSV com ponto e vírgula e decimais com vírgula)
   if (SDok) {
     File dataFile = SD.open(nomeArquivoCSV.c_str(), FILE_WRITE);
     if (dataFile) {
       dataFile.print(millis());
-      dataFile.print(",");
+      dataFile.print(";");
       dataFile.print(obterDataHoraFormatada());
-      dataFile.print(",");
+      dataFile.print(";");
       // Mecânica
-      dataFile.print(dadosCarga.torqueNm, 3);
-      dataFile.print(",");
-      dataFile.print(dadosCarga.thrustKg, 3);
-      dataFile.print(",");
+      dataFile.print(formatFloat(dadosCarga.torqueNm, 3));
+      dataFile.print(";");
+      dataFile.print(formatFloat(dadosCarga.thrustKg, 3));
+      dataFile.print(";");
       // Elétrica (Fases)
-      dataFile.print(dadosAmper.correnteAC1, 2);
-      dataFile.print(",");
-      dataFile.print(dadosAmper.correnteAC2, 2);
-      dataFile.print(",");
-      dataFile.print(dadosAmper.correnteAC3, 2);
-      dataFile.print(",");
+      dataFile.print(formatFloat(dadosAmper.correnteAC1, 2));
+      dataFile.print(";");
+      dataFile.print(formatFloat(dadosAmper.correnteAC2, 2));
+      dataFile.print(";");
+      dataFile.print(formatFloat(dadosAmper.correnteAC3, 2));
+      dataFile.print(";");
       // Elétrica (Entrada/Total)
-      dataFile.print(dadosAmper.correnteDC, 2);
-      dataFile.print(",");
-      dataFile.print(dadosVolts.tensaoV, 2);
-      dataFile.print(",");
-      dataFile.println(potenciaReal_W, 2); 
+      dataFile.print(formatFloat(dadosAmper.correnteDC, 2));
+      dataFile.print(";");
+      dataFile.print(formatFloat(dadosVolts.tensaoV, 2));
+      dataFile.print(";");
+      dataFile.print(formatFloat(potenciaReal_W, 2)); 
+      dataFile.print(";");
+      dataFile.println(formatFloat(dadosRotacao.rpm, 1)); 
       
       dataFile.close();
     }
@@ -185,4 +190,11 @@ void configurarRTCAutomaticamente() {
   int month = (strstr(month_names, s_month) - month_names) / 3 + 1;
   rtc.setTime(hour, minute, second);
   rtc.setDate(day, month, year - 2000);
+}
+
+// --- FUNÇÃO AUXILIAR DE FORMATAÇÃO ---
+String formatFloat(float val, int casas) {
+  String s = String(val, casas);
+  s.replace('.', ','); // Substitui ponto por vírgula
+  return s;
 }
