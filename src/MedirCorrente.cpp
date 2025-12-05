@@ -7,7 +7,7 @@
 
 // --- MODELO ACS758LCB-100B (+- 100A) ---
 // #define MODELO_100B_5V    // 20 mV/A (Padrão para este sensor a 5V)
-#define MODELO_100B_3V3   // ~13.2 mV/A (Apenas se VCC do sensor for 3.3V)
+//#define MODELO_100B_3V3   // ~13.2 mV/A (Apenas se VCC do sensor for 3.3V)
 
 // --- CASO NENHUM SEJA SELECIONADO (SEGURANÇA) ---
 #if !defined(MODELO_100B_5V)
@@ -32,7 +32,7 @@ const float NOISE_DEADZONE_AMPS = 0.30;       // Zona morta de 0.3A
 
 // --- SELEÇÃO AUTOMÁTICA DA SENSIBILIDADE ---
 #if defined(MODELO_100B_5V)
-  const float SENSIBILIDADE_V_A = 0.020; 
+  const float SENSIBILIDADE_V_A = 0.0132; 
 #elif defined(MODELO_100B_3V3)
   const float SENSIBILIDADE_V_A = 0.0132;
 #else
@@ -113,7 +113,7 @@ DadosCorrente lerSensoresCorrente() {
         // Lógica: (Raw - Offset) * (Vref / Scale) / Sensibilidade
         float i1 = ((float)raw1 - offset_AC1) * (ADC_VOLTAGE_REF / ADC_SCALE) / SENSIBILIDADE_V_A;
         float i2 = ((float)raw2 - offset_AC2) * (ADC_VOLTAGE_REF / ADC_SCALE) / SENSIBILIDADE_V_A;
-        float i3 = ((float)raw3 - offset_AC3) * (ADC_VOLTAGE_REF / ADC_SCALE) / SENSIBILIDADE_V_A;
+        float i3 = ((float)raw3 - offset_AC3) * (3.3 / ADC_SCALE) / SENSIBILIDADE_V_A;
 
         // 3. Acumula o quadrado da corrente
         somaQuadradaCurrent_AC1 += (double)i1 * (double)i1;
