@@ -13,8 +13,8 @@
 #define PWM_MAX 2000 
 
 // --- CONFIGURAÇÃO DA ESCADA AUTOMÁTICA ---
-#define TAMANHO_DEGRAU_PERCENTUAL 5  // Incremento de 5%
-#define TEMPO_EM_CADA_DEGRAU_MS 5000 // 5 segundos em cada patamar
+#define TAMANHO_DEGRAU_PERCENTUAL 10  // Incremento de 5%
+#define TEMPO_EM_CADA_DEGRAU_MS 2000 // 5 segundos em cada patamar
 
 // Estados da Máquina
 enum class EstadoMotor {

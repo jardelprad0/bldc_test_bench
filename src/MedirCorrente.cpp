@@ -7,12 +7,12 @@
 
 // --- MODELO ACS758LCB-100B (+- 100A) ---
 // #define MODELO_100B_5V    // 20 mV/A (Padrão para este sensor a 5V)
-//#define MODELO_100B_3V3   // ~13.2 mV/A (Apenas se VCC do sensor for 3.3V)
+#define MODELO_100B_3V3   // ~13.2 mV/A (Apenas se VCC do sensor for 3.3V)
 
 // --- CASO NENHUM SEJA SELECIONADO (SEGURANÇA) ---
-#if !defined(MODELO_100B_5V)
-    #define MODELO_100B_5V 
-#endif
+// #if !defined(MODELO_100B_5V)
+//     #define MODELO_100B_5V 
+// #endif
 // =================================================================================
 
 // --- DEFINIÇÃO DOS PINOS (ADC - STM32F407) ---
@@ -32,7 +32,7 @@ const float NOISE_DEADZONE_AMPS = 0.30;       // Zona morta de 0.3A
 
 // --- SELEÇÃO AUTOMÁTICA DA SENSIBILIDADE ---
 #if defined(MODELO_100B_5V)
-  const float SENSIBILIDADE_V_A = 0.0132; 
+  const float SENSIBILIDADE_V_A = 0.020; 
 #elif defined(MODELO_100B_3V3)
   const float SENSIBILIDADE_V_A = 0.0132;
 #else
@@ -91,14 +91,16 @@ DadosCorrente lerSensoresCorrente() {
     unsigned long startTime = millis();
     long amostrasCount = 0;
 
-    // Acumuladores para AC (Soma dos Quadrados da Corrente)
-    // Baseado na lógica do main.cpp: sumOfSquares += current * current
-    double somaQuadradaCurrent_AC1 = 0.0;
-    double somaQuadradaCurrent_AC2 = 0.0;
-    double somaQuadradaCurrent_AC3 = 0.0;
+    // Acumuladores para AC (Soma dos Quadrados e Soma Simples para Variância)
+    double somaQuadradaRaw_AC1 = 0.0;
+    double somaQuadradaRaw_AC2 = 0.0;
+    double somaQuadradaRaw_AC3 = 0.0;
+    
+    long somaRaw_AC1 = 0;
+    long somaRaw_AC2 = 0;
+    long somaRaw_AC3 = 0;
 
     // Acumulador para DC (Soma Bruta para Média)
-    // Baseado na lógica do main.cpp: totalReadings += analogRead
     long somaLeituras_DC = 0;
 
     // --- LOOP DE AMOSTRAGEM (Janela de Tempo) ---
@@ -108,20 +110,19 @@ DadosCorrente lerSensoresCorrente() {
         int raw1 = analogRead(PIN_AC1);
         int raw2 = analogRead(PIN_AC2);
         int raw3 = analogRead(PIN_AC3);
+        int rawDC = analogRead(PIN_DC);
         
-        // 2. Cálculo da Corrente Instantânea (AC)
-        // Lógica: (Raw - Offset) * (Vref / Scale) / Sensibilidade
-        float i1 = ((float)raw1 - offset_AC1) * (ADC_VOLTAGE_REF / ADC_SCALE) / SENSIBILIDADE_V_A;
-        float i2 = ((float)raw2 - offset_AC2) * (ADC_VOLTAGE_REF / ADC_SCALE) / SENSIBILIDADE_V_A;
-        float i3 = ((float)raw3 - offset_AC3) * (3.3 / ADC_SCALE) / SENSIBILIDADE_V_A;
+        // 2. Acumula para AC (Método da Variância para remover Offset Drift)
+        somaQuadradaRaw_AC1 += (double)raw1 * (double)raw1;
+        somaQuadradaRaw_AC2 += (double)raw2 * (double)raw2;
+        somaQuadradaRaw_AC3 += (double)raw3 * (double)raw3;
+        
+        somaRaw_AC1 += raw1;
+        somaRaw_AC2 += raw2;
+        somaRaw_AC3 += raw3;
 
-        // 3. Acumula o quadrado da corrente
-        somaQuadradaCurrent_AC1 += (double)i1 * (double)i1;
-        somaQuadradaCurrent_AC2 += (double)i2 * (double)i2;
-        somaQuadradaCurrent_AC3 += (double)i3 * (double)i3;
-
-        // 4. Leitura DC (Apenas acumula o RAW, conforme sua lógica)
-        somaLeituras_DC += analogRead(PIN_DC);
+        // 3. Acumula para DC
+        somaLeituras_DC += rawDC;
         
         amostrasCount++;
     }
@@ -129,11 +130,28 @@ DadosCorrente lerSensoresCorrente() {
     if (amostrasCount == 0) amostrasCount = 1; // Proteção div por zero
 
     // --- CÁLCULOS FINAIS ---
+    double N = (double)amostrasCount;
+    float fatorConversao = (ADC_VOLTAGE_REF / ADC_SCALE) / SENSIBILIDADE_V_A;
 
-    // 1. AC: Cálculo do RMS = Raiz(Media(Quadrados))
-    dados.correnteAC1 = sqrt(somaQuadradaCurrent_AC1 / (double)amostrasCount);
-    dados.correnteAC2 = sqrt(somaQuadradaCurrent_AC2 / (double)amostrasCount);
-    dados.correnteAC3 = sqrt(somaQuadradaCurrent_AC3 / (double)amostrasCount);
+    // 1. AC: Cálculo do RMS via Variância (RMS do componente AC puro)
+    // Var = E[X^2] - (E[X])^2
+    // RMS_AC = sqrt(Var)
+    
+    double mean1 = (double)somaRaw_AC1 / N;
+    double mean2 = (double)somaRaw_AC2 / N;
+    double mean3 = (double)somaRaw_AC3 / N;
+
+    double var1 = (somaQuadradaRaw_AC1 / N) - (mean1 * mean1);
+    double var2 = (somaQuadradaRaw_AC2 / N) - (mean2 * mean2);
+    double var3 = (somaQuadradaRaw_AC3 / N) - (mean3 * mean3);
+    
+    if (var1 < 0) var1 = 0;
+    if (var2 < 0) var2 = 0;
+    if (var3 < 0) var3 = 0;
+
+    dados.correnteAC1 = sqrt(var1) * fatorConversao;
+    dados.correnteAC2 = sqrt(var2) * fatorConversao;
+    dados.correnteAC3 = sqrt(var3) * fatorConversao;
 
     // 2. DC: Cálculo da Média e Conversão Final
     float mediaRawDC = (float)somaLeituras_DC / (float)amostrasCount;

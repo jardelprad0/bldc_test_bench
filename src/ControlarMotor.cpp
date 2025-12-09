@@ -15,7 +15,7 @@ float pwmDesejado = 1000;    // PWM alvo do degrau atual
 // Temporizadores
 unsigned long timeRamp = 0;
 unsigned long timeWait = 0;
-const int delayRamp = 2; // Suavidade da transição entre degraus
+const int delayRamp = 1; // Suavidade da transição entre degraus
 
 // --- FUNÇÕES AUXILIARES ---
 int converterPercentParaPwm(int percent) {
@@ -102,8 +102,8 @@ DadosMotor processarMotor() {
 
                 // Passo de incremento do PWM (5us)
                 int step = 0;
-                if (pwmDesejado > pwmAtual) step = 3;
-                else if (pwmDesejado < pwmAtual) step = -3;
+                if (pwmDesejado > pwmAtual) step = 5;
+                else if (pwmDesejado < pwmAtual) step = -5;
 
                 // Se ainda não chegou no alvo
                 if (abs(pwmAtual - pwmDesejado) > 4) {

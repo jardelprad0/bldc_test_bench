@@ -160,16 +160,17 @@ void processarCicloDeLeitura() {
   float potenciaReal_W = dadosVolts.tensaoV * dadosAmper.correnteDC;
   if (potenciaReal_W < 0) potenciaReal_W = 0;
   // 4. PLOTTER SERIAL
-  //MySerial.print(" Torque:");   MySerial.print(formatFloat(dadosCarga.torqueNm, 2));
- // MySerial.print(" Thrust:");   MySerial.print(formatFloat(dadosCarga.thrustKg, 2));
+  MySerial.print(" Torque:");   MySerial.print(formatFloat(dadosCarga.torqueNm, 2));
+ MySerial.print(" Thrust:");   MySerial.print(formatFloat(dadosCarga.thrustKg, 2));
   MySerial.print(" AC1:");      MySerial.print(formatFloat(dadosAmper.correnteAC1, 2));
+  MySerial.print(" AC2:");      MySerial.print(formatFloat(dadosAmper.correnteAC2, 2));
   MySerial.print(" AC3:");      MySerial.print(formatFloat(dadosAmper.correnteAC3, 2));
   MySerial.print(" DC:");       MySerial.print(formatFloat(dadosAmper.correnteDC, 2));
   MySerial.print(" Tensao:");   MySerial.print(formatFloat(dadosVolts.tensaoV, 2));
   MySerial.print(" Potencia_W:"); MySerial.print(formatFloat(potenciaReal_W, 2));
-  // MySerial.print(" RPM:");      MySerial.print(formatFloat(dadosRotacao.rpm, 0)); 
-  // MySerial.print(" Motor_%:");  MySerial.print(formatFloat(dadosMot.aceleracaoPercentual, 1));
-  // MySerial.print(" Est:");      MySerial.print(dadosMot.estadoAtual);
+  MySerial.print(" RPM:");      MySerial.print(formatFloat(dadosRotacao.rpm, 0)); 
+  MySerial.print(" Motor_%:");  MySerial.print(formatFloat(dadosMot.aceleracaoPercentual, 1));
+  MySerial.print(" Est:");      MySerial.print(dadosMot.estadoAtual);
   
   
   MySerial.println(); 
