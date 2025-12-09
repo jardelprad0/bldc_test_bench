@@ -9,7 +9,7 @@ Este projeto consiste em uma bancada de testes automatizada para caracterizaçã
   - **Tensão:** INA219 (via I2C).
   - **Corrente:** ACS758 (Analógico).
   - **Força (Empuxo/Torque):** Células de carga com HX711.
-  - **RPM:** Sensor de rotação (Interrupção).
+  - **RPM:** Sensor de velocidade SNG-QPLA-000 (Interrupção).
 - **Data Logging:** Gravação de dados em cartão SD em formato CSV.
 - **RTC:** Registro de data e hora para cada arquivo de log.
 - **Interface:** Monitor Serial para debug e botão físico para início/parada.
@@ -21,7 +21,7 @@ Este projeto consiste em uma bancada de testes automatizada para caracterizaçã
   - Módulo INA219 (Tensão/Corrente - usado aqui principalmente para Tensão)
   - Sensor de Corrente ACS758
   - Amplificadores HX711 (para Células de Carga)
-  - Sensor de RPM (Óptico ou Hall)
+  - Sensor de Velocidade Honeywell SNG-QPLA-000 (Quadrature Speed and Direction Sensor)
 - **Atuador:** ESC (Electronic Speed Controller) para motor BLDC
 - **Armazenamento:** Módulo Cartão SD
 
