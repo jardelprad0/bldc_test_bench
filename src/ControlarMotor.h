@@ -9,8 +9,8 @@
 #define PINO_BOTAO_START PE4
 
 // Faixa de PWM
-#define PWM_MIN 1000 
-#define PWM_MAX 2000 
+#define PWM_MIN 1500 
+#define PWM_MAX 1900 
 
 // --- CONFIGURAÇÃO DA ESCADA AUTOMÁTICA ---
 #define TAMANHO_DEGRAU_PERCENTUAL 10  // Incremento de 5%

@@ -17,10 +17,11 @@ float calibration_factor_thrust = -43.6067;
 const float GRAMAS_PARA_NEWTONS = 0.009807;
 
 // Distâncias (Metros)
-const float distancia_x_torque = 0.195; 
-const float distancia_y_torque = 0.100; 
-const float distancia_x_thrust = 0.270; 
-const float distancia_y_thrust = 0.140; 
+const float distancia_x_torque = 0.765;// << DISTÂNCIA DA FORÇA AO EIXO (em METROS)
+const float distancia_y_torque = 0.200;  // << DISTÂNCIA DA CÉLULA DE CARGA AO EIXO (em METROS)
+const float distancia_x_thrust = 0.925; //<< DISTÂNCIA DA FORÇA AO EIXO (em METROS)
+const float distancia_y_thrust = 0.140;  //<< DISTÂNCIA DA CÉLULA DE CARGA AO EIXO (em METROS)
+
 
 // --- FUNÇÃO DE CONFIGURAÇÃO (SETUP) ---
 void configurarCelulas() {
@@ -46,7 +47,7 @@ DadosMedicao lerDadosSensores() {
     
     // Preenche dados de torque
     dados.rawTorqueG = leitura_em_gramas_torque;
-    dados.torqueNm = forca_celula_N_torque * distancia_x_torque;
+    dados.torqueNm = forca_celula_N_torque * distancia_y_torque;
 
     // 2. LEITURA E CÁLCULO DO THRUST
     float leitura_em_gramas_thrust = scale_thrust.get_units(5);

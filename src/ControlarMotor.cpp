@@ -21,8 +21,8 @@ const int delayRamp = 1; // Suavidade da transição entre degraus
 int converterPercentParaPwm(int percent) {
     // Garante limites 0-100
     if (percent < 0) percent = 0;
-    if (percent > 100) percent = 100;
-    return map(percent, 0, 100, PWM_MIN, PWM_MAX);
+    if (percent > 80) percent = 80;
+    return map(percent, 0, 80, PWM_MIN, PWM_MAX);
 }
 
 // --- FUNÇÕES PRINCIPAIS ---
@@ -75,8 +75,8 @@ DadosMotor processarMotor() {
             // CÁLCULO DO PRÓXIMO DEGRAU
             if (sentidoSubida) {
                 percentualAlvoAtual += TAMANHO_DEGRAU_PERCENTUAL; // Sobe 5%
-                if (percentualAlvoAtual >= 100) {
-                    percentualAlvoAtual = 100;
+                if (percentualAlvoAtual >= 80) {
+                    percentualAlvoAtual = 80;
                     sentidoSubida = false; // Atingiu o topo, próxima vez começa a descer
                 }
             } else {
@@ -157,7 +157,7 @@ DadosMotor processarMotor() {
 
     // Retorno para Monitoramento
     dados.pwmMicroseconds = (int)pwmAtual;
-    dados.aceleracaoPercentual = map((long)pwmAtual, PWM_MIN, PWM_MAX, 0, 100);
+    dados.aceleracaoPercentual = map((long)pwmAtual, PWM_MIN, PWM_MAX, 0, 80);
     dados.setpointAtual = percentualAlvoAtual; // Mostra qual degrau estamos buscando/mantendo
     dados.ativo = motorLigado;
     
