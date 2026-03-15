@@ -17,10 +17,10 @@ float calibration_factor_thrust = -43.6067;
 const float GRAMAS_PARA_NEWTONS = 0.009807;
 
 // Distâncias (Metros)
-const float distancia_x_torque = 0.765;// << DISTÂNCIA DA FORÇA AO EIXO (em METROS)
-const float distancia_y_torque = 0.200;  // << DISTÂNCIA DA CÉLULA DE CARGA AO EIXO (em METROS)
-const float distancia_x_thrust = 0.925; //<< DISTÂNCIA DA FORÇA AO EIXO (em METROS)
-const float distancia_y_thrust = 0.140;  //<< DISTÂNCIA DA CÉLULA DE CARGA AO EIXO (em METROS)
+const float distancia_x_torque = 0.670;// << DISTÂNCIA DA FORÇA AO EIXO (em METROS)
+const float distancia_y_torque = 0.300;  // << DISTÂNCIA DA CÉLULA DE CARGA AO EIXO (em METROS)
+const float distancia_x_thrust = 0.930; //<< DISTÂNCIA DA FORÇA AO EIXO (em METROS)
+const float distancia_y_thrust = 0.460;  //<< DISTÂNCIA DA CÉLULA DE CARGA AO EIXO (em METROS)
 
 
 // --- FUNÇÃO DE CONFIGURAÇÃO (SETUP) ---
