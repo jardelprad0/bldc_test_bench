@@ -105,9 +105,8 @@ If you use this project in academic work, please cite it as:
 ```bibtex
 @misc{bldc_test_bench,
   author       = {Jardel Prado},
-  title        = {BLDC Test Bench: Automated Characterization Platform for BLDC Motors and Propellers},
+  title        = {Propulsion of Hybrid Aerial-Underwater Vehicles: Experimental Setup and Dataset},
   year         = {2026},
-  howpublished = {GitHub repository},
-  note         = {Accessed: 2026-03-16}
+  howpublished = {Brazilian Conference on Robotics - CROS}
 }
 ```
