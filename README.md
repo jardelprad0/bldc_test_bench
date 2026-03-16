@@ -1,79 +1,113 @@
 # BLDC Test Bench
 
-Este projeto consiste em uma bancada de testes automatizada para caracterização de motores BLDC e hélices, utilizando um microcontrolador STM32F407VET6. O sistema controla o motor através de uma sequência de testes pré-definida e registra dados de empuxo, torque, tensão, corrente e RPM em um cartão SD.
+This project is an automated test bench for BLDC motor and propeller characterization using an STM32F407VET6 microcontroller. The system drives the motor through a predefined test sequence and logs thrust, torque, voltage, current, and RPM data to an SD card.
 
-## 📋 Funcionalidades
+## 📋 Features
 
-- **Controle Automático de Motor:** Executa uma rampa de aceleração escalonada (ex: degraus de 10% a cada 2 segundos).
-- **Monitoramento de Sensores:**
-  - **Tensão:** INA219 (via I2C).
-  - **Corrente:** ACS758 (Analógico).
-  - **Força (Empuxo/Torque):** Células de carga com HX711.
-  - **RPM:** Sensor de velocidade SNG-QPLA-000 (Interrupção).
-- **Data Logging:** Gravação de dados em cartão SD em formato CSV.
-- **RTC:** Registro de data e hora para cada arquivo de log.
-- **Interface:** Monitor Serial para debug e botão físico para início/parada.
+- **Automatic Motor Control:** Runs a step-based acceleration ramp (for example, 10% duty-cycle steps every 2 seconds).
+- **Sensor Monitoring:**
+  - **Voltage:** INA219 (I2C).
+  - **Current:** ACS758 (analog).
+  - **Force (Thrust/Torque):** Load cells with HX711 amplifiers.
+  - **RPM:** SNG-QPLA-000 speed sensor (interrupt-based).
+- **Data Logging:** Records measurements to CSV files on an SD card.
+- **RTC Timestamping:** Includes date/time information in log filenames.
+- **Interface:** Serial monitor for debug and a physical button to start/stop tests.
 
 ## 🛠 Hardware
 
-- **Microcontrolador:** STM32F407VET6 (Black Board)
-- **Sensores:**
-  - Módulo INA219 (Tensão/Corrente - usado aqui principalmente para Tensão)
-  - Sensor de Corrente ACS758
-  - Amplificadores HX711 (para Células de Carga)
-  - Sensor de Velocidade Honeywell SNG-QPLA-000 (Quadrature Speed and Direction Sensor)
-- **Atuador:** ESC (Electronic Speed Controller) para motor BLDC
-- **Armazenamento:** Módulo Cartão SD
+- **Microcontroller:** STM32F407VET6 (Black Board)
+- **Sensors:**
+  - INA219 module (Voltage/Current - primarily used here for voltage)
+  - ACS758 current sensor
+  - HX711 amplifiers (for load cells)
+  - Honeywell SNG-QPLA-000 speed sensor (Quadrature Speed and Direction Sensor)
+- **Actuation:** ESC (Electronic Speed Controller) for BLDC motor
+- **Storage:** SD card module
 
-## 🔌 Pinagem (Pinout)
+## 🔌 Pinout
 
-| Periférico | Pino STM32 | Função |
+| Peripheral | STM32 Pin | Function |
 | :--- | :--- | :--- |
-| **Motor (ESC)** | `PD13` | Sinal PWM |
-| **Botão Início** | `PE4` | Botão (Input Pullup) - Inicia/Para sequência |
-| **Sensor RPM** | `PD12` | Entrada de Pulso (Interrupção) |
+| **Motor (ESC)** | `PD13` | PWM signal |
+| **Start Button** | `PE4` | Button (Input Pullup) - Start/Stop sequence |
+| **RPM Sensor** | `PD12` | Pulse input (interrupt) |
 | **I2C (INA219)** | `PB6` | SCL |
 | | `PB7` | SDA |
 | **SD Card** | `PA7` | MOSI |
 | | `PA6` | MISO |
 | | `PA5` | CLK |
 | | `PC11` | CS |
-| **SD Detect** | `PD2`, `PC8`, `PC12` | Pinos de detecção (verificar esquema) |
+| **SD Detect** | `PD2`, `PC8`, `PC12` | Detection pins (check wiring/schematic) |
 
-> **Nota:** O código pode mencionar `PE3` em mensagens de log, mas a definição funcional está configurada para `PE4`.
+> **Note:** The code may reference `PE3` in log messages, but the functional button pin is configured as `PE4`.
 
-## 🚀 Como Usar
+## 🚀 How to Use
 
-1. **Montagem:** Conecte todos os sensores e o ESC conforme a pinagem acima.
-2. **Cartão SD:** Insira um cartão SD formatado (FAT32).
-3. **Energia:** Alimente a placa e o sistema de potência do motor.
-4. **Início:**
-   - O sistema iniciará e calibrará a corrente (tara).
-   - Aguarde a mensagem "SISTEMA PRONTO" no Monitor Serial.
-   - Pressione o botão conectado em **PE4**.
-5. **Teste:**
-   - O motor iniciará a sequência de aceleração (degraus).
-   - Os dados serão mostrados no Serial e gravados no SD.
-   - Ao final, o motor desliga automaticamente.
+1. **Assembly:** Connect all sensors and the ESC according to the pinout above.
+2. **SD Card:** Insert a FAT32-formatted SD card.
+3. **Power:** Supply both the board and the motor power stage.
+4. **Start:**
+   - The system boots and performs current offset calibration (tare).
+   - Wait for the "SISTEMA PRONTO" message on the serial monitor.
+   - Press the button connected to **PE4**.
+5. **Test Run:**
+   - The motor executes the acceleration step sequence.
+   - Data is printed to serial and saved to SD.
+   - At the end of the sequence, the motor is turned off automatically.
 
-## 📂 Estrutura do Projeto
+## 📂 Project Structure
 
-- `src/main.cpp`: Loop principal, gerenciamento do SD e orquestração.
-- `src/ControlarMotor.cpp`: Máquina de estados para controle do PWM do motor.
-- `src/MedirCelulasdeCarga.cpp`: Leitura dos sensores de força (HX711).
-- `src/MedirCorrente.cpp`: Leitura do sensor ACS758.
-- `src/MedirTensao.cpp`: Leitura do INA219.
-- `src/MedirRPM.cpp`: Contagem de pulsos para cálculo de rotação.
+- `src/main.cpp`: Main loop, SD management, and orchestration.
+- `src/ControlarMotor.cpp`: State machine for motor PWM control.
+- `src/MedirCelulasdeCarga.cpp`: Load-cell (HX711) reading routines.
+- `src/MedirCorrente.cpp`: ACS758 current measurement.
+- `src/MedirTensao.cpp`: INA219 voltage measurement.
+- `src/MedirRPM.cpp`: Pulse counting and RPM calculation.
 
-## 📦 Dependências
+## 📈 Experimental Results
 
-As bibliotecas são gerenciadas automaticamente pelo PlatformIO (`platformio.ini`):
+The following plots summarize the recorded datasets in `Experiments/air` and `Experiments/water`.
+
+### Air Tests - 2312 Motor
+
+![Air 2312 analysis](Experiments/m2312_analysis.png)
+
+### Air Tests - 3508 Motor
+
+![Air 3508 analysis](Experiments/m3508_analysis.png)
+
+### Air Tests - 3508 Failed Run
+
+![Air 3508 failed run analysis](Experiments/m3508_fail_analysis.png)
+
+### Water Tests - T200
+
+![Water T200 analysis](Experiments/t200_analysis.png)
+
+## 📦 Dependencies
+
+Libraries are managed automatically by PlatformIO in `platformio.ini`:
 
 - `arduino-libraries/SD`
 - `bogde/HX711`
 - `stm32duino/STM32duino RTC`
 - `adafruit/Adafruit INA219`
 
-## ⚙️ Configuração
+## ⚙️ Configuration
 
-Para ajustar parâmetros como pinos, calibração de sensores ou curva de aceleração, edite os arquivos `.h` correspondentes na pasta `src/` ou as definições no topo dos arquivos `.cpp`.
+To adjust parameters such as pin mapping, sensor calibration, or acceleration profile settings, edit the corresponding `.h` files in `src/` or the top-level definitions in each `.cpp` file.
+
+## 📚 How to Cite
+
+If you use this project in academic work, please cite it as:
+
+```bibtex
+@misc{bldc_test_bench,
+  author       = {Jardel Prado},
+  title        = {BLDC Test Bench: Automated Characterization Platform for BLDC Motors and Propellers},
+  year         = {2026},
+  howpublished = {GitHub repository},
+  note         = {Accessed: 2026-03-16}
+}
+```
