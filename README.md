@@ -75,7 +75,7 @@ The following plots summarize the recorded datasets in `Experiments/air` and `Ex
 
 ### Air Tests - 3508 Motor
 
-![Air 3508 analysis](Experiments/m3508_analysis.png)
+![Air 3508 analysis](Experiments/m3508_analysis_dual.png)
 
 ### Air Tests - 3508 Failed Run
 
@@ -83,7 +83,7 @@ The following plots summarize the recorded datasets in `Experiments/air` and `Ex
 
 ### Water Tests - T200
 
-![Water T200 analysis](Experiments/t200_analysis.png)
+![Water T200 analysis](Experiments/t200_analysis_dual.png)
 
 ## 📦 Dependencies
 
