@@ -71,19 +71,19 @@ The following plots summarize the recorded datasets in `Experiments/air` and `Ex
 
 ### Air Tests - 2312 Motor
 
-![Air 2312 analysis](Experiments/m2312_analysis.png)
+![Air 2312 analysis](Experiments/images/2312_en.png)
 
 ### Air Tests - 3508 Motor
 
-![Air 3508 analysis](Experiments/m3508_analysis_dual.png)
+![Air 3508 analysis](Experiments/images/m3508_en.png)
 
 ### Air Tests - 3508 Failed Run
 
-![Air 3508 failed run analysis](Experiments/m3508_fail_analysis.png)
+![Air 3508 failed run analysis](Experiments/images/fail_m3504.png)
 
 ### Water Tests - T200
 
-![Water T200 analysis](Experiments/t200_analysis_dual.png)
+![Water T200 analysis](Experiments/images/t200_en.png)
 
 ## 📦 Dependencies
 
@@ -103,10 +103,14 @@ To adjust parameters such as pin mapping, sensor calibration, or acceleration pr
 If you use this project in academic work, please cite it as:
 
 ```bibtex
-@misc{bldc_test_bench,
-  author       = {Jardel Prado},
-  title        = {Propulsion of Hybrid Aerial-Underwater Vehicles: Experimental Setup and Dataset},
-  year         = {2026},
-  howpublished = {Brazilian Conference on Robotics - CROS}
-}
+@INPROCEEDINGS{11565558,
+  author={Prado, Jardel J. P. and Pinheiro, Pedro M. and Junior, Adir A. P. and Estrada, Emanuel S. D. and Drews-Jr, Paulo L. J.},
+  booktitle={2026 Brazilian Conference on Robotics (CROS)}, 
+  title={Propulsion of Hybrid Aerial-Underwater Vehicles: Experimental Setup and Dataset}, 
+  year={2026},
+  volume={},
+  number={},
+  pages={549-554},
+  keywords={Motors;Testing;Modeling;Propulsion;Propellers;Torque;Printing;Measurement;Equations;Media;Dataset;Propulsion Characterization;Bimodal Test Bench},
+  doi={10.1109/CROS69211.2026.11565558}}
 ```
